@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>DAYSHIFT — Safe spend for daily earners</title>
+	<meta name="description" content="Not a monthly budget. One daily safe-spend number for workers who earn by the shift." />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="css/main.css" />
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a3c2a'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='16' fill='%23f0c35a'%3E$%3C/text%3E%3C/svg%3E" />
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+			"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+		}
+	}
+	</script>
+</head>
+<body>
+	<div class="noise" aria-hidden="true"></div>
+	<div class="scanlines" aria-hidden="true"></div>
+
+	<header class="topbar">
+		<a class="brand" href="#hero" aria-label="DAYSHIFT home">
+			<span class="brand-mark" aria-hidden="true"></span>
+			<span class="brand-text">DAYSHIFT</span>
+		</a>
+		<nav class="nav" aria-label="Primary">
+			<a href="#cockpit">Cockpit</a>
+			<a href="#radar">Rent Gap</a>
+			<a href="#buffer">Buffer</a>
+			<a href="#shifts">Shifts</a>
+			<a href="#peers">Peers</a>
+			<a href="#ledger">Ledger</a>
+			<a href="#pipeline">Pipeline</a>
+		</nav>
+		<div class="topbar-actions">
+			<label class="worker-pick">
+				<span class="sr-only">Worker</span>
+				<select id="workerSelect"></select>
+			</label>
+			<button type="button" class="btn btn-ghost" id="simDateBtn" title="Simulation date">AS OF <span id="simDateLabel">Apr 27</span></button>
+			<button type="button" class="btn btn-accent" id="checkBuyBtn">Can I buy this?</button>
+		</div>
+	</header>
+
+	<main>
+		<section class="hero" id="hero">
+			<canvas id="hero3d" aria-hidden="true"></canvas>
+			<div class="hero-veil"></div>
+			<div class="hero-copy">
+				<p class="eyebrow">Alberta · daily · gig · hourly</p>
+				<h1 class="hero-brand">DAYSHIFT</h1>
+				<p class="hero-line">One number for what you can spend today — after rent, bills, and the next slow week.</p>
+				<div class="hero-cta">
+					<a class="btn btn-accent btn-lg" href="#cockpit">Open cockpit</a>
+					<button type="button" class="btn btn-ghost btn-lg" id="tourPersona">Tour W-0001</button>
+					<button type="button" class="btn btn-ghost btn-lg" id="autoDemo" title="Auto-scroll demo">Auto demo</button>
+				</div>
+				<p class="kbd-hint">Keys: <kbd>1</kbd>–<kbd>7</kbd> sections · <kbd>T</kbd> tour · <kbd>B</kbd> buy · <kbd>P</kbd> pipeline</p>
+			</div>
+			<div class="hero-float" id="heroFloat">
+				<div class="pulse-ring"></div>
+				<div class="safe-chip">
+					<span class="safe-chip-label">SAFE SPEND</span>
+					<span class="safe-chip-val" id="heroSafeVal">—</span>
+					<span class="safe-chip-sub" id="heroSafeSub">loading worker…</span>
+				</div>
+			</div>
+		</section>
+
+		<section class="strip" id="statsStrip">
+			<div class="strip-item"><span class="k" id="statWorkers">220</span><span class="v">workers</span></div>
+			<div class="strip-item"><span class="k" id="statShifts">—</span><span class="v">shifts logged</span></div>
+			<div class="strip-item"><span class="k" id="statAdvances">—</span><span class="v">wage advances</span></div>
+			<div class="strip-item"><span class="k" id="statFees">—</span><span class="v">fees paid</span></div>
+			<div class="strip-item"><span class="k" id="statBuffer">—</span><span class="v">buffer days</span></div>
+		</section>
+
+		<section class="panel cockpit" id="cockpit">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">01 · SafeSpend engine</p>
+					<h2>Today’s cockpit</h2>
+					<p class="lede">Not categories. Not a monthly fantasy. Reserved bills + volatility buffer + pending pay lag = what’s actually yours.</p>
+				</div>
+				<div class="verdict-pill" id="verdictPill" data-tone="amber">CALCULATING</div>
+			</header>
+
+			<div class="cockpit-grid">
+				<article class="safe-hero">
+					<canvas id="ringCanvas" width="320" height="320" aria-hidden="true"></canvas>
+					<div class="safe-hero-core">
+						<span class="label">SAFE TO SPEND</span>
+						<span class="amount" id="safeAmount">$0</span>
+						<span class="unit">CAD · today</span>
+						<p class="explain" id="safeExplain">—</p>
+					</div>
+				</article>
+
+				<article class="stack">
+					<div class="meter-card">
+						<div class="meter-top">
+							<span>Reserved for bills</span>
+							<strong id="reservedVal">$0</strong>
+						</div>
+						<div class="meter"><i id="reservedBar"></i></div>
+					</div>
+					<div class="meter-card">
+						<div class="meter-top">
+							<span>Volatility buffer</span>
+							<strong id="volBufVal">$0</strong>
+						</div>
+						<div class="meter meter-amber"><i id="volBufBar"></i></div>
+					</div>
+					<div class="meter-card">
+						<div class="meter-top">
+							<span>Pending / lagging pay</span>
+							<strong id="pendingVal">$0</strong>
+						</div>
+						<div class="meter meter-teal"><i id="pendingBar"></i></div>
+					</div>
+					<div class="breakdown" id="breakdownList"></div>
+				</article>
+
+				<article class="persona-card" id="personaCard">
+					<div class="persona-tag">PERSONA</div>
+					<h3 id="personaName">—</h3>
+					<p id="personaMeta">—</p>
+					<ul class="persona-stats" id="personaStats"></ul>
+					<div class="mini-map" id="cityBadge"></div>
+				</article>
+			</div>
+
+			<div class="buy-bar">
+				<label>Quick check
+					<input type="number" id="buyAmount" min="1" step="1" value="40" />
+				</label>
+				<select id="buyCategory">
+					<option value="groceries">Groceries</option>
+					<option value="transit">Transit / fuel</option>
+					<option value="childcare">Childcare</option>
+					<option value="food_out">Food out</option>
+					<option value="personal_care">Personal care</option>
+					<option value="entertainment">Entertainment</option>
+					<option value="misc">Misc</option>
+				</select>
+				<button type="button" class="btn btn-accent" id="runBuyCheck">Check affordability</button>
+				<div class="buy-result" id="buyResult" aria-live="polite"></div>
+			</div>
+		</section>
+
+		<section class="panel radar" id="radar">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">02 · Rent Gap Radar</p>
+					<h2>Will rent eat you?</h2>
+					<p class="lede">Projects income from your shift pattern against fixed obligations before they hit — so you don’t pay advance fees to discover the gap late.</p>
+				</div>
+				<div class="gap-badge" id="gapBadge">—</div>
+			</header>
+			<div class="radar-layout">
+				<div class="timeline-wrap">
+					<canvas id="timelineCanvas" width="960" height="280"></canvas>
+				</div>
+				<aside class="radar-side">
+					<h3>Upcoming hits</h3>
+					<ul id="obligationList"></ul>
+					<div class="gap-callout" id="gapCallout"></div>
+					<div class="shift-target" id="shiftTarget"></div>
+				</aside>
+			</div>
+		</section>
+
+		<section class="panel buffer" id="buffer">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">03 · Buffer Days OS</p>
+					<h2>Days of runway</h2>
+					<p class="lede">Balance lies when rent is due tomorrow. Buffer days = essential coverage at your burn rate.</p>
+				</div>
+			</header>
+			<div class="buffer-grid">
+				<article class="gauge-card">
+					<canvas id="gaugeCanvas" width="360" height="220"></canvas>
+					<div class="gauge-readout">
+						<span class="big" id="bufferDays">—</span>
+						<span class="sub">buffer days</span>
+					</div>
+				</article>
+				<article class="sim-card">
+					<h3>What moves runway?</h3>
+					<div class="sim-row">
+						<label>Extra shifts this week <input type="range" id="simShifts" min="0" max="5" value="0" /></label>
+						<span id="simShiftsVal">0</span>
+					</div>
+					<div class="sim-row">
+						<label>Skip next advance <input type="checkbox" id="simSkipAdv" checked /></label>
+					</div>
+					<div class="sim-row">
+						<label>Cut discretionary % <input type="range" id="simCut" min="0" max="50" value="0" step="5" /></label>
+						<span id="simCutVal">0%</span>
+					</div>
+					<p class="sim-result" id="simResult">Adjust sliders to simulate.</p>
+				</article>
+				<article class="week-chart">
+					<h3>Weekly cashflow</h3>
+					<canvas id="weekCanvas" width="640" height="240"></canvas>
+				</article>
+			</div>
+		</section>
+
+		<section class="panel shifts" id="shifts">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">04 · Shift ROI + Advance Cost</p>
+					<h2>Work units, not wishful thinking</h2>
+				</div>
+			</header>
+			<div class="two-col">
+				<article>
+					<h3>Shift value (all-in)</h3>
+					<p class="lede-sm">Net pay minus predicted same-day burn (transit, food, childcare signals).</p>
+					<div class="table-wrap">
+						<table id="shiftTable">
+							<thead><tr><th>Date</th><th>Shift</th><th>Net</th><th>Burn</th><th>All-in</th><th>Method</th></tr></thead>
+							<tbody></tbody>
+						</table>
+					</div>
+				</article>
+				<article>
+					<h3>Skip the fee</h3>
+					<p class="lede-sm">Every advance has a shadow cost in shifts. Alternatives from your own history.</p>
+					<div id="advancePanel" class="advance-panel"></div>
+					<canvas id="feeCanvas" width="520" height="200"></canvas>
+				</article>
+			</div>
+		</section>
+
+		<section class="panel peers" id="peers">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">05 · Peer Ground Truth</p>
+					<h2>People like you</h2>
+					<p class="lede">Absolute dollars shame. Relative context clarifies — same occupation, rent burden, and pay type.</p>
+				</div>
+			</header>
+			<div class="peer-grid">
+				<article class="peer-card" id="peerYou"></article>
+				<article class="peer-card peer-pool" id="peerPool"></article>
+				<article class="peer-viz">
+					<canvas id="peerCanvas" width="640" height="280"></canvas>
+					<div class="peer-cloud" id="peerCloud"></div>
+				</article>
+			</div>
+		</section>
+
+		<section class="panel ledger" id="ledger">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">06 · Live ledger + multi-pocket</p>
+					<h2>Where the money actually is</h2>
+				</div>
+				<div class="filters">
+					<button type="button" class="chip active" data-filter="all">All</button>
+					<button type="button" class="chip" data-filter="income">Income</button>
+					<button type="button" class="chip" data-filter="essential">Essential</button>
+					<button type="button" class="chip" data-filter="discretionary">Discretionary</button>
+				</div>
+			</header>
+			<div class="pocket-row" id="pocketRow"></div>
+			<div class="ledger-split">
+				<ul class="txn-list" id="txnList"></ul>
+				<div class="flow3d-wrap">
+					<canvas id="flow3d" aria-label="3D cashflow field"></canvas>
+					<p class="flow-cap">Cashflow field — credits rise, debits sink, essentials glow copper.</p>
+				</div>
+			</div>
+		</section>
+
+		<section class="panel pipeline" id="pipeline">
+			<header class="panel-head">
+				<div>
+					<p class="eyebrow">07 · 6-pass analysis</p>
+					<h2>Engine briefing</h2>
+					<p class="lede">Sequential passes with forward-feeding context — each pass writes into an accumulator the next pass reads (forecast → schedule → SafeSpend → Rent Gap → peers → briefing).</p>
+				</div>
+				<button type="button" class="btn btn-accent" id="runPipeline">Run pipeline</button>
+			</header>
+			<ol class="pass-list" id="passList"></ol>
+			<div class="briefing" id="briefing" aria-live="polite"></div>
+			<div class="brief-actions">
+				<button type="button" class="btn btn-ghost" id="speakBriefing">Speak briefing (Web Speech)</button>
+				<button type="button" class="btn btn-ghost" id="exportBriefing">Export .txt</button>
+			</div>
+		</section>
+	</main>
+
+	<footer class="footer">
+		<div>
+			<strong>DAYSHIFT</strong> · Cursor Hackathon · Alberta daily-earner OS
+		</div>
+		<div class="footer-meta">
+			<span id="loadMeta">—</span>
+			<a href="README.md">README</a>
+		</div>
+	</footer>
+
+	<dialog id="buyDialog" class="modal">
+		<form method="dialog" id="buyForm">
+			<header>
+				<h3>Can I buy this?</h3>
+				<button type="submit" value="cancel" class="icon-x" aria-label="Close">×</button>
+			</header>
+			<label>Amount (CAD)
+				<input type="number" id="dlgAmount" min="1" value="28" required />
+			</label>
+			<label>What is it?
+				<input type="text" id="dlgWhat" value="Groceries" />
+			</label>
+			<label>Essential?
+				<select id="dlgEssential"><option value="1">Yes — keep the lights on</option><option value="0">No — nice to have</option></select>
+			</label>
+			<div class="dlg-actions">
+				<button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
+				<button type="button" class="btn btn-accent" id="dlgConfirm">Verdict</button>
+			</div>
+			<div class="dlg-verdict" id="dlgVerdict"></div>
+		</form>
+	</dialog>
+
+	<div class="toast" id="toast" role="status"></div>
+	<div class="loader" id="loader">
+		<div class="loader-orb"></div>
+		<p data-loader-msg>Spinning up DAYSHIFT…</p>
+		<p class="loader-hint" id="loaderHint">Works opened directly or via GitHub Pages.</p>
+	</div>
+
+	<script>
+	/* Boot watchdog — runs even if scripts fail to load */
+	window.__DAYSHIFT_BOOTED = false;
+	setTimeout(function () {
+		if (window.__DAYSHIFT_BOOTED) return;
+		var loader = document.getElementById("loader");
+		if (!loader || loader.classList.contains("hide")) return;
+		loader.classList.add("error");
+		var msg = loader.querySelector("[data-loader-msg]");
+		var hint = document.getElementById("loaderHint");
+		if (msg) msg.textContent = "Still loading — check that data/bundle.js and js/*.js sit next to index.html.";
+		if (hint) hint.innerHTML = "Regenerate data: <code>python3 scripts/build_bundle.py</code> then reopen this file.";
+	}, 8000);
+	</script>
+	<script src="data/bundle.js"></script>
+	<script src="js/engine.js"></script>
+	<script src="js/charts.js"></script>
+	<script src="js/app.js"></script>
+</body>
+</html>
